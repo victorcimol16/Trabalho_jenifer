@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Maquete 3D interativa do romance O Cortiço, de Aluísio Azevedo. Trabalho de Victor, Cássio e Sérgio, turma 62-2.">
+<meta property="og:title" content="O Cortiço em maquete">
+<meta property="og:description" content="Maquete 3D interativa do romance O Cortiço, de Aluísio Azevedo. Turma 62-2.">
+<meta name="theme-color" content="#e6e4dd">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 16 16 6l12 10v12H4z' fill='%239b2b2c'/%3E%3Crect x='13' y='19' width='6' height='9' fill='%23f7f5ef'/%3E%3C/svg%3E">
+<title>O Cortiço em maquete · Victor, Cássio e Sérgio (62-2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+/* Tela única: faixa fina de cabeçalho e a maquete ocupando o resto. A ficha abre como uma folha de papel por cima. */
+:root{
+  --bg:#e6e4dd; --paper:#f7f5ef; --ink:#23211d; --muted:#6a655b; --line:#c9c4b8; --red:#9b2b2c;
+  --stage:#d9d6cc; --shade:rgba(25,22,18,.5);
+  --serif:"EB Garamond", Garamond, "Iowan Old Style", Georgia, serif;
+  --ui:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#171614; --paper:#211f1c; --ink:#e8e4da; --muted:#a39d90; --line:#3a3731; --red:#e0776f;
+  --stage:#24221f; --shade:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#171614; --paper:#211f1c; --ink:#e8e4da; --muted:#a39d90; --line:#3a3731; --red:#e0776f;
+  --stage:#24221f; --shade:rgba(0,0,0,.6); color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:18px;line-height:1.5;margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+
+.app{height:100%;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:4px 24px;flex-wrap:wrap;padding-inline:20px;padding-block:12px 10px;border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-weight:500;font-size:24px;line-height:1.2}
+.top h1 span{font-weight:400;font-style:italic;color:var(--muted)}
+.top p{margin:0;font-size:16px;color:var(--muted)}
+.top p strong{font-weight:500;color:var(--ink)}
+
+.stage{position:relative;flex:1;min-height:420px;background:var(--stage);overflow:hidden;touch-action:none}
+.stage canvas{display:block;width:100%;height:100%}
+.pins{position:absolute;inset:0;pointer-events:none}
+.pinlbl{position:absolute;left:0;top:0;pointer-events:auto;background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:3px;padding:3px 9px 4px;cursor:pointer;font-family:var(--serif);font-size:15px;line-height:1.2;white-space:nowrap}
+.pinlbl.sp{border-color:var(--red);color:var(--red)}
+.pinlbl:hover,.pinlbl.hot{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.hint{position:absolute;left:16px;bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-family:var(--ui);font-size:13px;color:var(--muted)}
+.hint button{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer;font-family:var(--ui);font-size:13px;min-height:34px}
+.hint button:hover{border-color:var(--ink)}
+.fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--muted)}
+@media (max-width:600px){.pinlbl{font-size:13px;padding:2px 7px 3px}.hint span{display:none}.top h1{font-size:21px}}
+
+/* Folha */
+.ov{position:fixed;inset:0;background:var(--shade);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.sheet{position:relative;background:var(--paper);color:var(--ink);width:min(760px,100%);max-height:min(90vh,980px);overflow:auto;border-radius:2px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.sh-head{position:sticky;top:0;background:var(--paper);padding:22px 28px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.sh-head h2{margin:0;font-weight:500;font-size:34px;line-height:1.1;text-wrap:balance}
+.sh-head p{margin:4px 0 0;font-style:italic;color:var(--muted)}
+.x{flex:none;background:none;border:1px solid var(--line);border-radius:3px;width:40px;height:40px;cursor:pointer;font-family:var(--ui);font-size:20px;line-height:1}
+.x:hover{border-color:var(--ink)}
+.sh-body{padding:6px 28px 30px;max-width:68ch}
+.sh-body h3{margin:26px 0 8px;font-weight:600;font-size:20px}
+.sh-body p{margin:0 0 10px}
+.sh-body .who{color:var(--muted);font-size:16px}
+ol.evo{margin:0 0 6px;padding-left:22px}
+ol.evo li{margin-bottom:10px}
+ol.evo li::marker{color:var(--muted)}
+ol.evo li:last-child{color:var(--red)}
+ol.evo q,ol.evo .ref{display:block;font-size:16px}
+ol.evo q{font-style:italic;color:var(--ink)}
+ol.evo li:last-child q{color:var(--red)}
+.ref{color:var(--muted);font-size:15px}
+blockquote{margin:0 0 14px;padding:0 0 0 16px;border-left:2px solid var(--red);font-style:italic;font-size:19px}
+blockquote .ref{display:block;font-style:normal;margin-top:2px}
+dl.cc{margin:0}
+dl.cc dt{font-weight:600}
+dl.cc dd{margin:0 0 10px}
+ul.now{margin:0;padding-left:20px}
+ul.now li{margin-bottom:6px}
+@media (max-width:600px){.sh-head{padding:16px 16px 12px}.sh-head h2{font-size:27px}.sh-body{padding:4px 16px 24px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>O Cortiço <span>de Aluísio Azevedo, em maquete</span></h1>
+    <p><strong>Victor, Cássio e Sérgio</strong> · turma 62-2</p>
+  </header>
+  <main class="stage" id="stage">
+    <div class="pins" id="pins"></div>
+    <div class="hint">
+      <button id="reset">Voltar à vista inicial</button>
+      <span>Arraste para girar, role para aproximar e clique num prédio.</span>
+    </div>
+  </main>
+</div>
+
+<div class="ov" id="ov" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title" id="sheet"></div>
+</div>
+
+<script>
+/* ================== DADOS ================== */
+const CONCEPT_DEF = {
+  "Determinismo":"Para Taine, o ser humano é produto de raça, meio e momento histórico.",
+  "Zoomorfização":"Descrever pessoas com traços de animais.",
+  "Positivismo":"Estudar a sociedade com o método das ciências: observar, classificar, diagnosticar.",
+  "Meio social":"O ambiente coletivo molda o corpo e a moral de quem vive nele."
+};
+const HOT = [
+ { id:"venda", n:"01", name:"Venda de João Romão", sub:"Coração do organismo", spec:true,
+   organ:"Coração", fn:"Bombeia o dinheiro de todo o cortiço",
+   desc:"Venda, depois bazar, onde João Romão dorme sobre o balcão, vende fiado, rouba no peso e empresta a oito por cento ao mês. Daqui o dinheiro sai para comprar terrenos, a pedreira e as 95 casinhas.",
+   who:["João Romão","Bertoleza","caixeiros Domingos e Manuel"],
+   specimen:{ name:"João Romão", diag:"Avareza crônica com delírio de nobreza",
+     stages:[
+       {k:"sao",t:"Caixeiro econômico",q:"Dormia sobre o balcão da própria venda, em cima de uma esteira",r:"cap. I"},
+       {k:"ag",t:"Febre de possuir",q:"Aquilo já não era ambição, era uma moléstia nervosa",r:"cap. I"},
+       {k:"ag",t:"Inveja do Barão",q:"Maldita economia!",r:"cap. X"},
+       {k:"deg",t:"Burguês consumado",p:"Transforma o cortiço em Avenida São Romão, fica noivo de Zulmira e entrega Bertoleza aos antigos donos.",r:"após o cap. X"}]},
+   quotes:[
+     {q:"Aquilo já não era ambição, era uma moléstia nervosa, uma loucura, um desespero de acumular; de reduzir tudo a moeda.",r:"cap. I"},
+     {q:"e da burra para o banco, aos contos e aos contos.",r:"cap. I"}],
+   concepts:[
+     ["Positivismo","O narrador registra a ambição como caso clínico: \"moléstia nervosa\", \"loucura\"."],
+     ["Determinismo","A cobiça aparece como instinto que governa todos os atos do espécime."],
+     ["Meio social","A fortuna nasce da exploração de Bertoleza e dos moradores do próprio cortiço."]],
+   now:["Especulação imobiliária: um único dono controla moradia, comércio e crédito.","Agiotagem e endividamento de quem mora em periferias.","Aluguel caro por quartos pequenos e sem contrato."] },
+
+ { id:"pasto", n:"02", name:"Casa de pasto", sub:"Estômago do organismo", spec:true,
+   organ:"Estômago", fn:"Alimenta os trabalhadores da pedreira e das fábricas",
+   desc:"Ao lado da venda, Bertoleza cozinha das quatro da madrugada até a noite, sem domingo nem dia santo. Cheiro de azeite frito, café de milho queimado e parati.",
+   who:["Bertoleza","operários","cavouqueiros"],
+   specimen:{ name:"Bertoleza", diag:"Exploração animalizada até o descarte",
+     stages:[
+       {k:"sao",t:"Quitandeira próspera",q:"a sua quitanda era a mais bem afreguesada do bairro.",r:"cap. I"},
+       {k:"ag",t:"Liberdade falsa",q:"a tal carta de liberdade era obra do próprio João Romão",r:"cap. I"},
+       {k:"ag",t:"Animal de carga",q:"trabalhando e mais a amiga como uma junta de bois",r:"cap. I"},
+       {k:"deg",t:"Descarte",p:"Denunciada aos herdeiros do antigo dono quando João Romão quer casar com Zulmira, ela se mata com a faca de cozinha.",r:"após o cap. X"}]},
+   quotes:[
+     {q:"A casa de pasto fermentava revolucionada, como um estômago de bêbedo depois de grande bródio",r:"cap. VII"},
+     {q:"Bertoleza não queria sujeitar-se a negros e procurava instintivamente o homem numa raça superior à sua.",r:"cap. I · visão racista do narrador"}],
+   concepts:[
+     ["Zoomorfização","Bertoleza e João Romão trabalham \"como uma junta de bois\"; a casa de pasto é um estômago."],
+     ["Determinismo","O narrador explica o comportamento dela pela \"raça\", típico do racismo científico de 1890."],
+     ["Meio social","A escravidão continua por dentro da relação: ela trabalha e ele acumula."]],
+   now:["Trabalho doméstico e de cozinha feito, em sua maioria, por mulheres negras, mal pago e invisível.","Racismo estrutural: a herança da escravidão ainda define quem trabalha mais e ganha menos."] },
+
+ { id:"casa35", n:"03", name:"Casinha nº 35", sub:"Jerônimo e Piedade", spec:true,
+   organ:"Célula em mutação", fn:"Moradia do casal português",
+   desc:"Casinha arrumada, com oratório e cômoda. Jerônimo é contramestre da pedreira e Piedade lava roupa. O meio tropical e Rita Baiana transformam o espécime por dentro.",
+   who:["Jerônimo","Piedade de Jesus","a filha Marianita (no colégio)"],
+   specimen:{ name:"Jerônimo", diag:"Aclimatação degenerativa por ação do meio tropical",
+     stages:[
+       {k:"sao",t:"Português metódico",q:"Era tão metódico e tão bom como trabalhador quanto o era como homem.",r:"cap. V"},
+       {k:"ag",t:"Contágio pela dança",q:"um ninho de cobras negras e venenosas, que lhe iam devorar o coração.",r:"cap. VII"},
+       {k:"ag",t:"Abrasileiramento",q:"e Jerônimo abrasileirou-se.",r:"cap. IX"},
+       {k:"deg",t:"Degeneração",p:"Mata Firmo numa emboscada, abandona Piedade e a filha e vai viver com Rita Baiana. Piedade cai no alcoolismo.",r:"após o cap. X"}]},
+   quotes:[
+     {q:"resignando-se, vencido, às imposições do sol e do calor",r:"cap. IX"},
+     {q:"os olhos todavia, humildes como os olhos de um boi de canga, exprimiam tranqüila bondade.",r:"cap. III"}],
+   concepts:[
+     ["Determinismo","O clima e o sol do Brasil vencem a disciplina europeia: o meio decide pelo espécime."],
+     ["Zoomorfização","Jerônimo é um \"boi de canga\", forte e manso, até ser contaminado."],
+     ["Meio social","Muda a comida, a bebida, a música e o corpo: vinho vira cachaça, bacalhau vira vatapá."]],
+   now:["O estereótipo do \"brasileiro preguiçoso por causa do calor\" ainda circula.","Preconceito regional: o Norte e o Nordeste tratados como lugares de atraso."] },
+
+ { id:"casa9", n:"04", name:"Casinha nº 9", sub:"Rita Baiana", spec:true,
+   organ:"Agente contaminante", fn:"Moradia de Rita Baiana",
+   desc:"Rita volta de Jacarepaguá e o cortiço inteiro festeja. Organiza os pagodes de domingo e dança o chorado. Para o narrador, ela é a própria natureza brasileira em forma de mulher.",
+   who:["Rita Baiana","Firmo (amante)","Porfiro (visita)"],
+   agent:"Rita não degenera: ela é o agente que transforma Jerônimo. O narrador a usa como símbolo do meio tropical, e não como pessoa com escolhas.",
+   quotes:[
+     {q:"ela era a luz ardente do meio-dia; ela era o calor vermelho das sestas da fazenda",r:"cap. VII"},
+     {q:"com muito de serpente e muito de mulher.",r:"cap. VII"}],
+   concepts:[
+     ["Zoomorfização","Rita é \"serpente\", \"cobra verde e traiçoeira\", \"lagarta viscosa\"."],
+     ["Determinismo","A mulher mestiça é descrita como sensual por natureza, produto da \"raça\" e do clima."],
+     ["Meio social","Ela recusa o casamento como cativeiro, o que o narrador apresenta como vício."]],
+   now:["Hipersexualização da mulher negra e mestiça na mídia e na publicidade.","Estereótipo da \"mulata\" que ainda aparece no carnaval e em piadas."] },
+
+ { id:"casa15", n:"05", name:"Casinha nº 15", sub:"Pombinha e Dona Isabel", spec:true,
+   organ:"Célula contaminada", fn:"Moradia da moça letrada do cortiço",
+   desc:"Pombinha escreve as cartas dos moradores, faz as contas e lê o jornal para todos. Dona Isabel espera que ela se case com o Costa para saírem do cortiço.",
+   who:["Pombinha","Dona Isabel","Léonie (visita)"],
+   specimen:{ name:"Pombinha", diag:"Contaminação moral pelo convívio com o meio",
+     stages:[
+       {k:"sao",t:"Flor do cortiço",q:"A filha era a flor do cortiço.",r:"cap. III"},
+       {k:"ag",t:"Absorve as misérias",q:"toda a súmula daquelas paixões e daqueles ressentimentos",r:"cap. VI"},
+       {k:"ag",t:"Contato com Léonie",q:"Não tens que recear: minha casa é muito sossegada...",r:"cap. IX · fala de Léonie"},
+       {k:"deg",t:"Ciclo reproduzido",p:"Separa-se do marido, torna-se prostituta ao lado de Léonie e passa a proteger Juju, que segue o mesmo caminho.",r:"após o cap. X"}]},
+   quotes:[
+     {q:"a pobre rapariga ia acumulando no seu coração de donzela toda a súmula daquelas paixões e daqueles ressentimentos, às vezes mais fétidos do que a evaporação de um lameiro",r:"cap. VI"}],
+   concepts:[
+     ["Meio social","Nem a educação nem a pureza protegem do ambiente: o cortiço contamina."],
+     ["Determinismo","O destino dela repete o de Léonie, e Juju repete o dela."],
+     ["Positivismo","As misérias são comparadas à \"evaporação de um lameiro\", como um gás tóxico."]],
+   now:["Falta de oportunidade de estudo e trabalho para jovens de periferia.","Exploração sexual de meninas em situação de pobreza.","Ciclo da pobreza passado de geração em geração."] },
+
+ { id:"patio", n:"06", name:"Pátio, tinas e bicas", sub:"Pulmões e pele", spec:false,
+   organ:"Pulmões e pele", fn:"Espaço coletivo de trabalho e convivência",
+   desc:"Às cinco da manhã o cortiço acorda: lavadeiras nas tinas, fila nas bicas e nas latrinas, crianças fazendo as necessidades no capinzal. Brigas, cantos e fofocas se misturam.",
+   who:["Leandra, a Machona","Augusta Carne-Mole","Leocádia","Paula, a Bruxa","Marciana e Florinda","Albino"],
+   quotes:[
+     {q:"Eram cinco horas da manhã e o cortiço acordava, abrindo, não os olhos, mas a sua infinidade de portas e janelas alinhadas.",r:"cap. III"},
+     {q:"um verminar constante de formigueiro assanhado.",r:"cap. III"}],
+   concepts:[
+     ["Zoomorfização","O cortiço tem olhos, acorda e fervilha; os moradores são formigas e vermes."],
+     ["Meio social","A vida privada não existe: tudo é coletivo, visto e comentado."],
+     ["Positivismo","O narrador observa a multidão como um cientista observa uma colônia."]],
+   now:["Saneamento precário: banheiro e água compartilhados, esgoto a céu aberto.","A doença ligada à moradia, como a febre amarela do século XIX, ainda existe com dengue e outras."] },
+
+ { id:"pedreira", n:"07", name:"Pedreira", sub:"Esqueleto e músculos", spec:false,
+   organ:"Esqueleto e musculatura", fn:"Fonte de riqueza e de trabalho pesado",
+   desc:"João Romão compra a pedreira e põe homens para quebrar pedra e fazer paralelepípedos. Um trabalhador morre numa explosão mal feita; Jerônimo é contratado para dirigir o serviço.",
+   who:["Jerônimo","cavouqueiros","macaqueiros","o ferreiro Bruno"],
+   quotes:[
+     {q:"Aqueles homens gotejantes de suor, bêbados de calor, desvairados de insolação",r:"cap. IV"},
+     {q:"pareciam um punhado de demônios revoltados na sua impotência contra o impassível gigante",r:"cap. IV"}],
+   concepts:[
+     ["Meio social","O trabalho brutal sob o sol desgasta corpo e mente."],
+     ["Determinismo","O calor e a insolação agem como forças que comandam os homens."],
+     ["Zoomorfização","Trabalhadores dormem como \"besta cansada\" debaixo dos bambus."]],
+   now:["Trabalho braçal precarizado: informalidade, jornadas longas e acidentes.","O trabalhador morto é substituído na semana seguinte, como no livro."] },
+
+ { id:"capinzal", n:"08", name:"Capinzal e mangueiras", sub:"Sistema dos instintos", spec:false,
+   organ:"Sistema dos instintos", fn:"Fundos escondidos do cortiço",
+   desc:"Atrás do cortiço, longe dos olhos, acontecem os encontros que o narrador trata como impulso animal: Leocádia e Henrique, Florinda e o caixeiro Domingos.",
+   who:["Leocádia","Bruno","Florinda","Domingos"],
+   quotes:[
+     {q:"Um dia de manhãzinha, às quatro horas, no capinzal, debaixo das mangueiras...",r:"cap. IX · Florinda"},
+     {q:"Com quem te esfregavas tu, sua vaca?!",r:"cap. VIII · Bruno"}],
+   concepts:[
+     ["Zoomorfização","As mulheres são chamadas de \"vaca\" e \"galinha\" pelos maridos."],
+     ["Determinismo","O desejo aparece como instinto que ninguém controla."],
+     ["Meio social","Florinda engravida, a mãe enlouquece e é despejada; o caixeiro foge sem punição."]],
+   now:["Falta de educação sexual e de espaços seguros nas periferias.","A culpa da gravidez recai sobre as mulheres; os homens somem."] },
+
+ { id:"sobrado", n:"09", name:"Sobrado do Miranda", sub:"Cabeça da elite", spec:false,
+   organ:"Cabeça da elite", fn:"Observa o cortiço de cima",
+   desc:"Miranda, comerciante português, vive num casamento de aparências com Dona Estela e compra um título de Barão do Freixal. Olha o cortiço com nojo e inveja.",
+   who:["Miranda, Barão do Freixal","Dona Estela","Zulmira","Henrique","Botelho"],
+   quotes:[
+     {q:"floresta implacável que lhe crescia junto da casa, por debaixo das janelas, e cujas raízes, piores e mais grossas do que serpentes, minavam por toda a parte",r:"cap. II"},
+     {q:"Fui uma besta!",r:"cap. II · Miranda"}],
+   concepts:[
+     ["Zoomorfização","O cortiço é uma floresta de serpentes que ameaça o sobrado."],
+     ["Meio social","A elite também é viciada: adultério, interesse e vaidade."],
+     ["Positivismo","A divisão sobrado × cortiço organiza a sociedade em camadas visíveis."]],
+   now:["Segregação urbana: condomínios fechados ao lado de comunidades, com muros e grades.","A pobreza vista como ameaça, e não como resultado da exploração."] },
+
+ { id:"casinhas", n:"10", name:"As 95 casinhas", sub:"Tecido celular", spec:false,
+   organ:"Tecido celular", fn:"Moradia que se multiplica",
+   desc:"Construídas com material furtado e reaproveitado. Alugadas por mês, pagas adiantado; enchem-se antes de a tinta secar. Quem não paga é despejado, como Marciana.",
+   who:["lavadeiras","cavouqueiros","mascates italianos","o velho Libório"],
+   quotes:[
+     {q:"Noventa e cinco casinhas comportou a imensa estalagem.",r:"cap. I"},
+     {q:"e multiplicar-se como larvas no esterco.",r:"cap. I"}],
+   concepts:[
+     ["Zoomorfização","Os moradores nascem e se multiplicam como larvas."],
+     ["Meio social","A moradia apertada e suja produz o comportamento descrito no livro."],
+     ["Determinismo","Quem nasce no cortiço tende a repetir o destino do cortiço."]],
+   now:["Adensamento e coabitação em cortiços que ainda existem nos centros de São Paulo e do Rio.","Despejos e falta de política de habitação popular."] }
+];
+const BYID = Object.fromEntries(HOT.map(h=>[h.id,h]));
+const CONCEPTS = [
+  {t:"Determinismo",d:"Hippolyte Taine: o comportamento humano é determinado por raça, meio e momento histórico. Não há livre escolha.",s:"\"O espécime não decidiu; foi determinado.\""},
+  {t:"Zoomorfização",d:"Descrever pessoas como animais: formigas, larvas, bois, cobras. Reduz o humano ao instinto.",s:"\"A colônia desperta como um formigueiro.\""},
+  {t:"Positivismo",d:"Auguste Comte: a sociedade pode ser estudada com o método das ciências exatas.",s:"\"Registramos os dados com rigor clínico.\""},
+  {t:"Meio social",d:"O ambiente físico e coletivo (moradia, trabalho, vizinhança) molda corpo e moral.",s:"\"O cortiço é o laboratório; os moradores, as cobaias.\""}
+];
+
+/* ================== FICHA ================== */
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ov=document.getElementById("ov"), sheet=document.getElementById("sheet");
+let lastFocus=null;
+function openSheet(id){
+  const h=BYID[id]; if(!h) return;
+  lastFocus=document.activeElement;
+  let evo="";
+  if(h.specimen){
+    evo=`<h3>Como ${esc(h.specimen.name)} muda</h3>
+      <p>Diagnóstico: <em>${esc(h.specimen.diag.toLowerCase())}</em>.</p>
+      <ol class="evo">${h.specimen.stages.map(s=>`<li>${esc(s.t)}${s.q?`<q>${esc(s.q)}</q><span class="ref">${esc(s.r)}</span>`:`<span class="ref">${esc(s.p)} (${esc(s.r)})</span>`}</li>`).join("")}</ol>`;
+  } else if(h.agent){
+    evo=`<h3>Papel na história</h3><p>${esc(h.agent)}</p>`;
+  }
+  sheet.innerHTML=`
+    <div class="sh-head">
+      <div><h2 id="sh-title">${esc(h.name)}</h2><p>No corpo do cortiço: ${esc(h.organ.toLowerCase())}. ${esc(h.fn)}.</p></div>
+      <button class="x" id="close" aria-label="Fechar">×</button>
+    </div>
+    <div class="sh-body">
+      <h3>O lugar</h3>
+      <p>${esc(h.desc)}</p>
+      <p class="who">Quem aparece aqui: ${h.who.map(esc).join(", ")}.</p>
+      ${evo}
+      <h3>No livro</h3>
+      ${h.quotes.map(q=>`<blockquote>“${esc(q.q)}”<span class="ref">${esc(q.r)}</span></blockquote>`).join("")}
+      <h3>Conceitos</h3>
+      <dl class="cc">${h.concepts.map(([c,t])=>`<dt>${esc(c)}</dt><dd>${esc(t)}</dd>`).join("")}</dl>
+      <h3>E hoje?</h3>
+      <ul class="now">${h.now.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>
+    </div>`;
+  ov.hidden=false; sheet.scrollTop=0;
+  document.getElementById("close").addEventListener("click",closeSheet);
+  document.getElementById("close").focus();
+  setSelected(id);
+}
+function closeSheet(){ ov.hidden=true; setSelected(null); if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
+ov.addEventListener("click",e=>{ if(e.target===ov) closeSheet(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!ov.hidden) closeSheet(); });
+
+/* ================== MAQUETE 3D ================== */
+let setSelected=()=>{};
+(function(){
+  const stage=document.getElementById("stage"), pinsEl=document.getElementById("pins");
+  if(!window.THREE || !THREE.OrbitControls){ fail(); return; }
+  let renderer;
+  try{ renderer=new THREE.WebGLRenderer({antialias:true}); }catch(e){ fail(); return; }
+  function fail(){ const d=document.createElement("div"); d.className="fallback"; d.textContent="A maquete 3D não pôde ser carregada neste navegador. Tente abrir no Chrome ou no Edge atualizados."; stage.appendChild(d); }
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  stage.insertBefore(renderer.domElement,pinsEl);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(36,1,.1,300);
+  const HOME={pos:new THREE.Vector3(-24,30,34),tgt:new THREE.Vector3(0,0,1)};
+  camera.position.copy(HOME.pos);
+  const controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.target.copy(HOME.tgt); controls.enableDamping=true; controls.dampingFactor=.08;
+  controls.maxPolarAngle=1.3; controls.minDistance=14; controls.maxDistance=80;
+
+  function readBg(){ const c=getComputedStyle(document.documentElement).getPropertyValue("--stage").trim()||"#d9d6cc"; scene.background=new THREE.Color(c); }
+  readBg();
+  try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readBg); }catch(e){}
+  new MutationObserver(readBg).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+  scene.add(new THREE.HemisphereLight(0xfff6e6,0x5d6b4f,.72));
+  const sun=new THREE.DirectionalLight(0xfff0d4,.95); sun.position.set(-20,34,16); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-30,right:30,top:26,bottom:-26,near:1,far:90}); sun.shadow.bias=-.0008;
+  scene.add(sun);
+
+  // ---- utilitários
+  let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647; return (seed-1)/2147483646;};
+  const groups={}; let CUR=null;
+  function mat(c,o={}){ return new THREE.MeshLambertMaterial(Object.assign({color:c},o)); }
+  function add(mesh,parent,x=0,y=0,z=0,cast=true){ mesh.position.set(x,y,z); mesh.castShadow=cast; mesh.receiveShadow=true; (parent||scene).add(mesh); if(CUR){ mesh.userData.hot=CUR; (groups[CUR]=groups[CUR]||[]).push(mesh);} return mesh; }
+  const box=(w,h,d,c,p,x,y,z,cast)=>add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c)),p,x,y,z,cast);
+  const cyl=(rt,rb,h,c,p,x,y,z,seg=14)=>add(new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat(c)),p,x,y,z);
+  const sph=(r,c,p,x,y,z)=>add(new THREE.Mesh(new THREE.SphereGeometry(r,12,10),mat(c)),p,x,y,z);
+  function roofGeo(w,d,h){ const s=new THREE.Shape(); s.moveTo(-d/2,0); s.lineTo(d/2,0); s.lineTo(0,h); s.lineTo(-d/2,0);
+    const g=new THREE.ExtrudeGeometry(s,{depth:w,bevelEnabled:false}); g.translate(0,0,-w/2); g.rotateY(Math.PI/2); return g; }
+  function roof(w,d,h,c,p,x,y,z){ return add(new THREE.Mesh(roofGeo(w,d,h),mat(c)),p,x,y,z); }
+  function textTex(lines,bg,fg,w=512,h=128){ const cv=document.createElement("canvas"); cv.width=w; cv.height=h; const g=cv.getContext("2d");
+    g.fillStyle=bg; g.fillRect(0,0,w,h); g.strokeStyle=fg; g.lineWidth=6; g.strokeRect(6,6,w-12,h-12);
+    g.fillStyle=fg; g.textAlign="center"; g.textBaseline="middle";
+    const fs=lines.length>1?h*.3:h*.46; g.font=`bold ${fs}px Georgia, serif`;
+    lines.forEach((l,i)=>g.fillText(l,w/2,h/2+(i-(lines.length-1)/2)*fs*1.15));
+    const t=new THREE.CanvasTexture(cv); t.anisotropy=4; return t; }
+  function sign(lines,w,h,bg,fg,p,x,y,z,ry=0){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:textTex(lines,bg,fg)})); m.rotation.y=ry; add(m,p,x,y,z,false); return m; }
+  function person(p,x,z,c){ cyl(.12,.26,.7,c,p,x,.35,z,8); sph(.16,0x5a3d2b,p,x,.86,z); }
+
+  const WALLS=[0xefe3c8,0xe8d9b5,0xf1e8d6,0xe2d3b0,0xead6bc,0xdcd0b4], ROOFS=[0xa8573d,0x9b4f37,0xb3623f,0x94503a];
+  const WOOD=0x7a5638, GLASS=0x8fb4c6, GRASS=0x8fa86e, GRASS_DK=0x5f7d47, DIRT=0xd2c39f, ROCK=0xb4ae9f, ROCK_DK=0x8f897c;
+
+  function house(x,z,rot,i,hot,mark){
+    CUR=hot; const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=rot; scene.add(g);
+    const w=2,d=1.7,h=1.45;
+    box(w,h,d,WALLS[i%WALLS.length],g,0,h/2,0);
+    roof(w+.3,d+.35,.75,ROOFS[i%ROOFS.length],g,0,h,0);
+    box(.46,.85,.06,mark?0xa1233b:WOOD,g,0,.43,d/2+.03);
+    box(.38,.32,.05,GLASS,g,-.62,.9,d/2+.03); box(.38,.32,.05,GLASS,g,.62,.9,d/2+.03);
+    box(w+.06,.08,d+.06,0xcfc2a2,g,0,.04,0);
+    CUR=null; return g;
+  }
+
+  // ---- base da maquete
+  box(46,1.2,36,0x8a7a5e,null,0,-.6,0,false);
+  box(46,.04,36,0xc9bc98,null,0,.02,0,false);
+
+  // ---- PEDREIRA
+  CUR="pedreira";
+  { const s=new THREE.Shape(); s.moveTo(-23,0); let x=-23; s.lineTo(-23,5.5);
+    while(x<23){ x+=2+rnd()*2.4; s.lineTo(Math.min(x,23),4.4+rnd()*3.6); }
+    s.lineTo(23,0); s.lineTo(-23,0);
+    const geo=new THREE.ExtrudeGeometry(s,{depth:4.2,bevelEnabled:true,bevelSize:.3,bevelThickness:.3,bevelSegments:1});
+    add(new THREE.Mesh(geo,mat(ROCK)),null,0,0,-17.6); }
+  for(let i=0;i<16;i++){ const r=.5+rnd()*1.1; const m=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),mat(rnd()>.5?ROCK:ROCK_DK)); m.rotation.set(rnd()*3,rnd()*3,rnd()*3); add(m,null,-21+i*2.7+rnd(),r*.6,-12.6+rnd()*.8); }
+  for(let i=0;i<5;i++) box(1.2,.5,.8,0xc8c2b4,null,-8+i*1.4,.25,-11.4); // paralelepípedos
+  cyl(.03,.03,4,0xd9c9a0,null,-3,2.6,-13.3,5); cyl(.03,.03,4,0xd9c9a0,null,-2.4,2.6,-13.3,5);
+  box(2.2,.1,.6,WOOD,null,-2.7,4.2,-13.1);
+  person(null,-2.9,-12.9,0x4f6f8f); person(null,6,-11.6,0x7a5d3d); person(null,12,-11.8,0x4f6f8f);
+  { const c=new THREE.Group(); c.position.set(16,0,-11.2); scene.add(c); box(1.6,.6,1,WOOD,c,0,.6,0); [-.6,.6].forEach(dx=>{const wh=cyl(.32,.32,.12,0x3a2b1e,c,dx,.32,.55,12); wh.rotation.x=Math.PI/2;}); }
+  CUR=null;
+
+  // ---- CAPINZAL
+  CUR="capinzal";
+  box(46,.12,4.4,GRASS,null,0,.06,-9.2,false);
+  for(let i=0;i<46;i++){ const t=new THREE.Mesh(new THREE.ConeGeometry(.13,.5,5),mat(GRASS_DK)); add(t,null,-22+rnd()*44,.3,-11+rnd()*3.6); }
+  [[-8,-9.4,1.4],[-5.8,-9,1.1],[9,-9.3,1.3],[-17,-9.2,1]].forEach(([x,z,r])=>{ cyl(.18,.24,1.4,WOOD,null,x,.7,z,8); sph(r,GRASS_DK,null,x,1.4+r*.7,z); });
+  for(let i=0;i<6;i++) cyl(.07,.08,3,0x7e9a54,null,20+((i%3)*.4),1.5,-10+(i>2?.5:0),6);
+  CUR=null;
+
+  // ---- PÁTIO
+  CUR="patio";
+  box(24.6,.06,11.8,DIRT,null,-3.2,.07,0.1,false);
+  const tubs=[[-12,-2.6],[-10.4,-2.6],[-8.8,-2.6],[-7.2,-2.6],[-1.2,-2.6],[.4,-2.6],[2,-2.6],[-11.2,-.8],[-9.6,-.8],[-8,-.8],[-.4,-.8],[1.2,-.8]];
+  tubs.forEach(([x,z])=>{ cyl(.55,.48,.48,0x8a6747,null,x,.3,z,16); add(new THREE.Mesh(new THREE.CylinderGeometry(.47,.47,.02,16),mat(0x7fa9c0)),null,x,.53,z,false); });
+  person(null,-12,-3.4,0x4d7ca6); person(null,-8.8,-3.4,0xc24b57); person(null,.4,-3.4,0xe0bf55); person(null,-9.6,-1.6,0x4d7ca6);
+  // bica
+  cyl(.08,.08,1.6,0x6b6458,null,-4.6,.8,-4.6,8); box(.6,.08,.08,0x6b6458,null,-4.35,1.55,-4.6);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,.02,20),mat(0x86adc0,{transparent:true,opacity:.75})),null,-4.2,.11,-4.4,false);
+  // varais
+  const CL=[0xc24b57,0x4d7ca6,0xe0bf55,0xf4f1ea,0x6f8f5a];
+  [[2.2],[4.2]].forEach(([z],k)=>{ const x1=-13.5,x2=6; cyl(.05,.05,1.8,WOOD,null,x1,.9,z,6); cyl(.05,.05,1.8,WOOD,null,x2,.9,z,6);
+    const ln=cyl(.012,.012,x2-x1,0x5b5346,null,(x1+x2)/2,1.75,z,4); ln.rotation.z=Math.PI/2;
+    for(let x=x1+.7,i=k;x<x2-.5;x+=.85,i++){ const cw=.42+(i%3)*.12, ch=.5+(i%2)*.25; box(cw,ch,.03,CL[i%CL.length],null,x,1.75-ch/2,z); } });
+  // hortas
+  box(2.2,.18,2,GRASS_DK,null,-13.4,.15,5); box(2.4,.18,1.8,GRASS_DK,null,7.6,.15,-4.4);
+  for(let i=0;i<4;i++){ box(2,.12,.12,0x7fa060,null,-13.4,.3,4.3+i*.45); }
+  CUR=null;
+
+  // ---- CASINHAS
+  const backZ=-6.9;
+  for(let i=0;i<11;i++){ const x=-15.6+i*2.32; if(i===3) house(x,backZ,0,i,"casa35",true); else house(x,backZ,0,i,"casinhas"); }
+  const colZ=[-4.1,-1.85,.4,2.65,4.9];
+  colZ.forEach((z,i)=>{ if(i===2) house(-16.8,z,Math.PI/2,i+3,"casa9",true); else house(-16.8,z,Math.PI/2,i+3,"casinhas"); });
+  colZ.forEach((z,i)=>{ if(i===1) house(10.3,z,-Math.PI/2,i+6,"casa15",true); else house(10.3,z,-Math.PI/2,i+6,"casinhas"); });
+
+  // ---- VENDA
+  CUR="venda";
+  { const g=new THREE.Group(); g.position.set(-13.4,0,8.6); scene.add(g);
+    box(7.4,2.5,3.2,0xefe1c2,g,0,1.25,0); roof(7.8,3.7,1.1,0x9b4f37,g,0,2.5,0);
+    for(let i=0;i<4;i++) box(.9,1.7,.06,WOOD,g,-2.6+i*1.75,.85,1.62);
+    for(let i=0;i<8;i++){ const a=box(.95,.06,1.2,i%2?0xf4efe2:0xb83b4a,g,-3.33+i*.95,2.15,2.15); a.rotation.x=.38; }
+    sign(["VENDA DE","JOÃO ROMÃO"],3,.9,"#f4efe2","#1c2a39",g,0,3.05,1.9);
+    [[-3.2,2.3],[-2.6,2.5],[3.3,2.4]].forEach(([x,z])=>cyl(.32,.28,.7,0x8a6747,g,x,.35,z,12)); }
+  CUR=null;
+
+  // ---- CASA DE PASTO
+  CUR="pasto";
+  const smoke=[];
+  { const g=new THREE.Group(); g.position.set(-7.2,0,8.6); scene.add(g);
+    box(4.4,2.1,3.2,0xe6d6b4,g,0,1.05,0); roof(4.8,3.7,1,0xa8573d,g,0,2.1,0);
+    box(.9,1.6,.06,WOOD,g,0,.8,1.62); box(.9,.6,.05,GLASS,g,-1.4,1.2,1.62); box(.9,.6,.05,GLASS,g,1.4,1.2,1.62);
+    box(.5,1.2,.5,0x8b7f6c,g,1.3,3,-.5);
+    sign(["CASA DE PASTO"],2.6,.55,"#f4efe2","#1c2a39",g,0,2.35,1.75);
+    for(let i=0;i<5;i++){ const s=new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),new THREE.MeshLambertMaterial({color:0xe8e6e0,transparent:true,opacity:.6})); s.position.set(1.3,3.6+i*.6,-.5); g.add(s); smoke.push({m:s,o:i*.6}); } }
+  CUR=null;
+
+  // ---- MURO, PORTÃO E LANTERNA
+  box(5.6,1.5,.32,0xe3d6b9,null,-.4,.75,10.1); box(6.4,1.5,.32,0xe3d6b9,null,7.8,.75,10.1);
+  for(let x=-3;x<11;x+=.5){ if(x>2.3&&x<4.6) continue; const c=new THREE.Mesh(new THREE.ConeGeometry(.08,.22,4),mat(0x9fc9c8)); add(c,null,x,1.6,10.1,false); }
+  box(2.3,1.9,.2,0x5e432c,null,3.45,.95,10.1);
+  sign(["ESTALAGEM DE SÃO ROMÃO","Alugam-se casinhas e tinas"],3.6,.9,"#e0bf55","#7a1d2a",null,3.45,2.45,10.3);
+  const lan=add(new THREE.Mesh(new THREE.BoxGeometry(.32,.42,.32),new THREE.MeshBasicMaterial({color:0xd8303f})),null,3.45,3.2,10.25,false);
+  const pl=new THREE.PointLight(0xff3344,.9,7); pl.position.set(3.45,3.2,10.6); scene.add(pl);
+
+  // ---- MURO DO MIRANDA E SOBRADO
+  box(.3,1.9,17.5,0xd4c6a6,null,11.75,.95,1.4);
+  CUR="sobrado";
+  { const g=new THREE.Group(); g.position.set(16,0,1.6); scene.add(g);
+    box(6.4,5.8,14.4,0xf2ead8,g,0,2.9,0); box(6.6,.2,14.6,0xcfc2a2,g,0,2.95,0);
+    { const r=add(new THREE.Mesh(roofGeo(14.8,6.9,1.7),mat(0x8f4a34)),g,0,5.8,0); r.rotation.y=Math.PI/2; }
+    for(let i=0;i<9;i++){ const z=-6.2+i*1.55; box(.06,1.3,.7,GLASS,g,-3.22,4.2,z); box(.1,.1,.9,0xcfc2a2,g,-3.25,3.5,z); }
+    for(let i=0;i<5;i++){ const z=-5.6+i*2.8; box(.06,1.2,.7,GLASS,g,-3.22,1.4,z); }
+    box(1.3,2.2,.08,WOOD,g,0,1.1,7.22);
+    [-2,2].forEach(x=>{ box(.8,1.2,.06,GLASS,g,x,1.4,7.22); box(.8,1.3,.06,GLASS,g,x,4.2,7.22); });
+    box(5,.12,.8,0xcfc2a2,g,0,3.4,7.6);
+    [-2.4,2.4].forEach((x,k)=>{ cyl(.03,.03,1.4,0x5b5346,g,x,7.4,6.5,5); box(.7,.4,.02,k?0x4d7ca6:0xc24b57,g,x+.36,7.85,6.5); });
+    box(6.6,.1,3,GRASS,g,0,.08,-9); sph(.9,GRASS_DK,g,-2,1.3,-9); sph(.8,GRASS_DK,g,2,1.2,-9.4); }
+  CUR=null;
+
+  // ---- RUA
+  box(46,.08,5,0xa8a395,null,0,.06,15,false);
+  for(let x=-22;x<23;x+=1.1) box(.04,.02,5,0x8f8a7d,null,x,.11,15,false);
+  [[-18,14],[8,14]].forEach(([x,z])=>{ cyl(.06,.06,2.6,0x3a3a3a,null,x,1.3,z,6); sph(.18,0xf3e3a0,null,x,2.7,z); });
+  person(null,-2,14.2,0x7a5d3d); person(null,14,15.4,0x4f6f8f);
+
+  // ---- ETIQUETAS
+  const SHORT={"venda": "Venda do João Romão", "pasto": "Casa de pasto", "casa35": "Nº 35, Jerônimo", "casa9": "Nº 9, Rita Baiana", "casa15": "Nº 15, Pombinha", "patio": "Pátio", "pedreira": "Pedreira", "capinzal": "Capinzal", "sobrado": "Sobrado do Miranda", "casinhas": "Casinhas"};
+  const LB=[["venda",-13.4,4.4,8.6],["pasto",-7.2,4.2,8.6],["casa35",-8.64,2.9,-6.9],["casa9",-16.8,2.9,.4],["casa15",10.3,2.9,-1.85],["patio",-4,1.2,1.2],["pedreira",-4,8.6,-15.6],["capinzal",-13,2.4,-9.4],["sobrado",16,8.6,1.6],["casinhas",4,2.9,-6.9]];
+  const pins=LB.map(([id,x,y,z])=>{ const h=BYID[id]; const b=document.createElement("button"); b.className="pinlbl"+(h.spec?" sp":""); b.textContent=SHORT[id];
+    b.setAttribute("aria-label","Abrir ficha: "+h.name); b.addEventListener("click",()=>openSheet(id)); pinsEl.appendChild(b); return {id,el:b,v:new THREE.Vector3(x,y,z)}; });
+
+  // ---- interação
+  const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(); let hover=null, selected=null, down=null;
+  const all=[]; Object.values(groups).forEach(a=>all.push(...a));
+  function paint(){ Object.entries(groups).forEach(([id,ms])=>{ const on=id===selected?0x2a4a40:(id===hover?0x2e2b22:0x000000); ms.forEach(m=>{ if(m.material.emissive) m.material.emissive.setHex(on); }); });
+    pins.forEach(p=>p.el.classList.toggle("hot",p.id===hover||p.id===selected)); }
+  setSelected=id=>{ selected=id; paint(); };
+  function pick(e){ const r=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+    ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(all,false)[0]; return hit?hit.object.userData.hot:null; }
+  renderer.domElement.addEventListener("pointermove",e=>{ if(e.pointerType==="touch") return; const h=pick(e); if(h!==hover){ hover=h; paint(); renderer.domElement.style.cursor=h?"pointer":"grab"; } });
+  renderer.domElement.addEventListener("pointerdown",e=>{ down={x:e.clientX,y:e.clientY}; });
+  renderer.domElement.addEventListener("pointerup",e=>{ if(!down) return; const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y); down=null; if(moved<6){ const h=pick(e); if(h) openSheet(h); } });
+  renderer.domElement.addEventListener("pointerleave",()=>{ hover=null; paint(); });
+  document.getElementById("reset").addEventListener("click",()=>{ camera.position.copy(HOME.pos); controls.target.copy(HOME.tgt); controls.update(); });
+
+  // ---- tamanho e laço
+  function resize(){ const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h;
+    camera.fov = w<600?50:36; camera.updateProjectionMatrix(); }
+  new ResizeObserver(resize).observe(stage); resize();
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const tmp=new THREE.Vector3(); const clock=new THREE.Clock();
+  function loop(){
+    const t=clock.getElapsedTime();
+    if(!reduce) smoke.forEach(s=>{ const k=((t*.35+s.o)%3)/3; s.m.position.y=3.6+k*3; s.m.scale.setScalar(.6+k*1.4); s.m.material.opacity=.65*(1-k); });
+    pl.intensity=.75+Math.sin(t*3)*.12;
+    controls.update(); renderer.render(scene,camera);
+    const w=stage.clientWidth,h=stage.clientHeight;
+    pins.forEach(p=>{ tmp.copy(p.v).project(camera); if(tmp.z>1||tmp.z<-1){ p.el.hidden=true; return; } p.el.hidden=false;
+      p.el.style.transform=`translate(${(tmp.x*.5+.5)*w}px,${(-tmp.y*.5+.5)*h}px) translate(-50%,-100%)`; });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>
