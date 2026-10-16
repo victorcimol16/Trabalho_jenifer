@@ -2,7 +2,7 @@
 
 Maquete 3D interativa do romance *O Cortiço*, de Aluísio Azevedo, feita para o trabalho "O Cortiço como Organismo Vivo".
 
-**Grupo:** Victor, Cássio e Sérgio · turma 62-2
+**Grupo:** Victor, Cássio, Sérgio e Enzo R. · turma 62-2
 
 ## Como usar
 
