@@ -487,10 +487,12 @@ let setSelected=()=>{};
   person(null,-2,14.2,0x7a5d3d); person(null,14,15.4,0x4f6f8f);
 
   // ---- ETIQUETAS
-  const SHORT={"venda": "Venda do João Romão", "pasto": "Casa de pasto, Bertoleza", "casa35": "Nº 35, Jerônimo", "casa9": "Nº 9, Rita Baiana", "casa15": "Nº 15, Pombinha", "patio": "Pátio", "pedreira": "Pedreira", "capinzal": "Capinzal", "sobrado": "Sobrado do Miranda", "casinhas": "Casinhas"};
+  const SHORT={"venda": "Venda do João Romão", "pasto": "Casa de pasto", "casa35": "Nº 35, Jerônimo", "casa9": "Nº 9, Rita Baiana", "casa15": "Nº 15, Pombinha", "patio": "Pátio", "pedreira": "Pedreira", "capinzal": "Capinzal", "sobrado": "Sobrado do Miranda", "casinhas": "Casinhas"};
   const LB=[["venda",-13.4,4.4,8.6],["pasto",-7.2,4.2,8.6],["casa35",-8.64,2.9,-6.9],["casa9",-16.8,2.9,.4],["casa15",10.3,2.9,-1.85],["patio",-4,1.2,1.2],["pedreira",-4,8.6,-15.6],["capinzal",-13,2.4,-9.4],["sobrado",16,8.6,1.6],["casinhas",4,2.9,-6.9]];
-  const pins=LB.map(([id,x,y,z])=>{ const h=BYID[id]; const b=document.createElement(h.spec?"button":"span"); b.className="pinlbl"+(h.spec?" sp":" muted"); b.textContent=SHORT[id];
-    if(h.spec){ b.setAttribute("aria-label","Abrir ficha: "+h.name); b.addEventListener("click",()=>openSheet(id)); } else b.setAttribute("aria-hidden","true"); pinsEl.appendChild(b); return {id,el:b,v:new THREE.Vector3(x,y,z)}; });
+  // só os personagens pesquisados pelo grupo são clicáveis
+  const ACTIVE=new Set(["casa35","casa9","casa15"]);
+  const pins=LB.map(([id,x,y,z])=>{ const h=BYID[id], on=ACTIVE.has(id); const b=document.createElement(on?"button":"span"); b.className="pinlbl"+(on?" sp":" muted"); b.textContent=SHORT[id];
+    if(on){ b.setAttribute("aria-label","Abrir ficha: "+h.name); b.addEventListener("click",()=>openSheet(id)); } else b.setAttribute("aria-hidden","true"); pinsEl.appendChild(b); return {id,el:b,v:new THREE.Vector3(x,y,z)}; });
 
   // ---- interação
   const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(); let hover=null, selected=null, down=null;
@@ -499,7 +501,7 @@ let setSelected=()=>{};
     pins.forEach(p=>p.el.classList.toggle("hot",p.id===hover||p.id===selected)); }
   setSelected=id=>{ selected=id; paint(); };
   function pick(e){ const r=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
-    ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(all,false)[0]; return hit?hit.object.userData.hot:null; }
+    ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(all,false)[0]; const id=hit&&hit.object.userData.hot; return ACTIVE.has(id)?id:null; }
   renderer.domElement.addEventListener("pointermove",e=>{ if(e.pointerType==="touch") return; const h=pick(e); if(h!==hover){ hover=h; paint(); renderer.domElement.style.cursor=h?"pointer":"grab"; } });
   renderer.domElement.addEventListener("pointerdown",e=>{ down={x:e.clientX,y:e.clientY}; });
   renderer.domElement.addEventListener("pointerup",e=>{ if(!down) return; const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y); down=null; if(moved<6){ const h=pick(e); if(h) openSheet(h); } });
